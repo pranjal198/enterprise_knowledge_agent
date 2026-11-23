@@ -1,0 +1,22 @@
+
+# LangChain
+langchain
+langchain-community
+langchain-text-splitters
+langchain-chroma
+langchain-google-genai
+
+# Google Gemini
+google-genai
+
+# Document processing
+pypdf
+
+# Environment configuration
+python-dotenv
+
+# Backend
+fastapi
+uvicorn[standard]
+python-multipart
+tavily-python
