@@ -13,11 +13,15 @@ CHROMA_PATH = PROJECT_ROOT / "chroma_db"
 COLLECTION_NAME = "company_documents"
 
 
-def create_vector_store(chunks):
+def create_vector_store(chunks, user_id: int, document_id: int):
     """
     Convert document chunks into embeddings
-    and store them in ChromaDB.
+    and store them in ChromaDB with ownership metadata.
     """
+
+    for chunk in chunks:
+        chunk.metadata["user_id"] = user_id
+        chunk.metadata["document_id"] = document_id
 
     vector_store = Chroma.from_documents(
         documents=chunks,
@@ -27,7 +31,6 @@ def create_vector_store(chunks):
     )
 
     return vector_store
-
 
 def load_vector_store():
     """

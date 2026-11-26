@@ -7,16 +7,17 @@ from app.retrieval.vector_store import load_vector_store
 vector_store = load_vector_store()
 
 
-def answer_question(question: str, k: int = 3):
+def answer_question(question: str, user_id: int, k: int = 3):
     """
     Retrieve relevant document chunks and generate
     an answer using Gemini.
     """
 
-    # 1. Retrieve relevant chunks
+    # 1. Retrieve relevant chunks belonging only to this user
     documents = vector_store.similarity_search(
         query=question,
-        k=k
+        k=k,
+        filter={"user_id": user_id}
     )
 
     if not documents:
