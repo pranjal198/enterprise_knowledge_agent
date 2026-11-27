@@ -29,11 +29,21 @@ from uuid import uuid4
 from fastapi import BackgroundTasks, status
 
 from app.tasks.document_tasks import process_document
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="Enterprise Knowledge Assistant",
     description="Ask questions about company documents using RAG.",
     version="1.0.0"
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 app.include_router(auth_router)
 
@@ -95,6 +105,7 @@ def database_health_check(db: Session = Depends(get_db)):
 
 
 
+
 @app.post("/chat", response_model=ChatResponse)
 def chat(
     request: ChatRequest,
@@ -126,30 +137,51 @@ def chat(
             db.add(conversation)
             db.flush()
 
-        # 2. Generate the answer using the existing RAG pipeline
+        # 2. Retrieve the 10 most recent messages
+        history_messages = db.scalars(
+            select(Message)
+            .where(Message.conversation_id == conversation.id)
+            .order_by(
+                Message.created_at.desc(),
+                Message.id.desc(),
+            )
+            .limit(10)
+        ).all()
+
+        # 3. Convert history into chronological order
+        conversation_history = [
+            {
+                "role": message.role,
+                "content": message.content,
+            }
+            for message in reversed(history_messages)
+        ]
+
+        # 4. Generate the answer using the RAG pipeline
         result = answer_question(
             request.question,
             user_id=current_user.id,
+            conversation_history=conversation_history,
         )
 
-        # 3. Create the user's message
+        # 5. Create the user's message
         user_message = Message(
             conversation_id=conversation.id,
             role="user",
             content=request.question
         )
 
-        # 4. Create the assistant's message
+        # 6. Create the assistant's message
         assistant_message = Message(
             conversation_id=conversation.id,
             role="assistant",
             content=result["answer"]
         )
 
-        # 5. Add both messages to the database session
+        # 7. Add both messages to the database session
         db.add_all([user_message, assistant_message])
 
-        # 6. Commit the transaction
+        # 8. Commit the transaction
         db.commit()
 
         return ChatResponse(

@@ -9,6 +9,40 @@ function App() {
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadMessage, setUploadMessage] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [token, setToken] = useState(null)
+  const [conversationId, setConversationId] = useState(null)
+
+  async function handleLogin(e) {
+  e.preventDefault()
+
+  try {
+    const formData = new URLSearchParams()
+    formData.append('username', email)
+    formData.append('password', password)
+
+    const response = await fetch('http://localhost:8000/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData,
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Login failed')
+    }
+
+    setToken(data.access_token)
+    setPassword('')
+    setError('')
+  } catch (error) {
+    setError(error.message)
+  }
+}
 
   async function handleFileUpload(e) {
     const file = e.target.files[0]
@@ -22,8 +56,11 @@ function App() {
     setUploadMessage('')
 
     try {
-      const response = await fetch('/upload', {
+      const response = await fetch('http://localhost:8000/upload', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: formData,
       })
 
@@ -34,7 +71,7 @@ function App() {
       }
 
       setUploadMessage(
-        `Successfully indexed ${data.filename} (${data.chunks} chunks)`
+        `${data.filename} uploaded successfully. Processing started.`
       )
     } catch (error) {
       setUploadMessage(error.message)
@@ -59,12 +96,16 @@ function App() {
     setError('')
 
     try {
-      const response = await fetch('/chat', {
+      const response = await fetch('http://localhost:8000/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ question: userQuestion }),
+        body: JSON.stringify({
+          question: userQuestion,
+          conversation_id: conversationId
+        }),
       })
 
       if (!response.ok) {
@@ -72,7 +113,7 @@ function App() {
       }
 
       const data = await response.json()
-
+      setConversationId(data.conversation_id)
       setMessages(prev => [
         ...prev,
         {
@@ -94,10 +135,42 @@ function App() {
     setMessages([])
     setQuestion('')
     setError('')
+    setConversationId(null)
   }
 
   return (
-    <div className="app">
+    !token ? (
+  <div className="login-container">
+    <h1>Enterprise Knowledge Assistant</h1>
+    <h2>Login</h2>
+
+    <form onSubmit={handleLogin}>
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
+
+      <input
+        type="password"
+        placeholder="Password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+      />
+
+      <button type="submit">
+        Login
+      </button>
+    </form>
+
+    {error && <p className="error">{error}</p>}
+  </div>
+) : (
+  // Your existing application UI goes here
+  <div className="app">
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-icon">K</div>
@@ -239,7 +312,9 @@ function App() {
         </form>
       </main>
     </div>
+    )
   )
 }
+    
 
 export default App
